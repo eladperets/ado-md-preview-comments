@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "ADO PR Markdown Preview Comments",
+  "version": "0.1.0",
+  "description": "Shows Azure DevOps pull request comments on top of the rendered markdown preview.",
+  "content_scripts": [
+    {
+      "matches": ["https://dev.azure.com/*", "https://*.visualstudio.com/*"],
+      "js": ["anchor.js", "ado-api.js", "content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

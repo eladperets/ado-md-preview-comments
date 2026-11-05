@@ -1,0 +1,231 @@
+.admc-anchored {
+  box-shadow: inset 2px 0 0 #0078d4;
+}
+
+.admc-root,
+.admc-root * {
+  box-sizing: border-box;
+  font: 13px/1.4 "Segoe UI", system-ui, sans-serif;
+}
+
+.admc-badge {
+  margin-left: 6px;
+  padding: 0 6px;
+  border: 1px solid;
+  border-radius: 10px;
+  color: #333;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+/* Thread status rank: 0 active, 1 pending, 2 resolved / won't fix, 3 closed. */
+.admc-rank-0 {
+  border-color: #d13438;
+  background: #fde7e9;
+}
+
+.admc-rank-1 {
+  border-color: #c19c00;
+  background: #fff4ce;
+}
+
+.admc-rank-2 {
+  border-color: #8a8a8a;
+  background: #ececec;
+}
+
+.admc-rank-3 {
+  border-color: #107c10;
+  background: #dff6dd;
+}
+
+.admc-popover {
+  position: fixed;
+  z-index: 100000;
+  width: 420px;
+  max-height: 60vh;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid #c8c8c8;
+  border-radius: 6px;
+  background: #fff;
+  color: #222;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.admc-thread + .admc-thread {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.admc-thread.admc-focus {
+  box-shadow: inset 2px 0 0 #0078d4;
+  padding-left: 6px;
+}
+
+.admc-thread-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.admc-comment {
+  margin: 4px 0 0 0;
+  padding-left: 8px;
+  border-left: 2px solid #e0e0e0;
+}
+
+.admc-content {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.admc-muted {
+  color: #666;
+}
+
+.admc-link {
+  margin-left: auto;
+  color: #0063b1;
+}
+
+.admc-status {
+  padding: 0 6px;
+  border: 0;
+  border-radius: 8px;
+  color: #333;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admc-comment-meta {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.admc-like {
+  margin-left: auto;
+  padding: 0 6px;
+  border: 1px solid #c8c8c8;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.admc-like.admc-liked {
+  border-color: #0078d4;
+  background: #e6f2fb;
+}
+
+span.admc-like {
+  cursor: default;
+}
+
+.admc-reply-row {
+  display: flex;
+  gap: 6px;
+  align-items: flex-end;
+  margin-top: 6px;
+}
+
+.admc-reply {
+  flex: 1;
+  padding: 4px;
+  border: 1px solid #c8c8c8;
+  border-radius: 4px;
+  background: #fff;
+  color: #222;
+  resize: vertical;
+}
+
+.admc-send {
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: #0078d4;
+  color: #fff;
+  cursor: pointer;
+}
+
+.admc-error {
+  color: #d13438;
+}
+
+.admc-error:empty {
+  display: none;
+}
+
+.admc-busy {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.admc-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 100000;
+  width: 360px;
+  border: 1px solid #c8c8c8;
+  border-radius: 6px;
+  background: #fff;
+  color: #222;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.admc-panel-head {
+  display: flex;
+}
+
+.admc-panel-toggle,
+.admc-panel-refresh {
+  padding: 6px 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.admc-panel-toggle {
+  flex: 1;
+  font-weight: 600;
+}
+
+.admc-panel-body {
+  display: none;
+  max-height: 50vh;
+  overflow: auto;
+  padding: 0 8px 8px;
+}
+
+.admc-panel.admc-open .admc-panel-body {
+  display: block;
+}
+
+.admc-panel-item {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  padding: 4px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.admc-panel-item:hover {
+  background: #f0f0f0;
+}
+
+.admc-panel-section {
+  margin: 8px 0 4px;
+  font-weight: 600;
+}
