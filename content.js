@@ -1,7 +1,8 @@
 // ADO PR Markdown Preview Comments: content script.
 //
 // On an Azure DevOps pull request "Files" view of a markdown file, shows the PR's comment threads
-// on top of the rendered Preview, and lets the user reply, like comments, and change thread status.
+// on top of the rendered Preview, and lets the user reply, like comments, change thread status,
+// and add new comments.
 //
 // Notes for reviewers:
 // - All network access is in ado-api.js, which only talks to the page's own origin.
@@ -74,16 +75,21 @@
     return !!state.data.me && (comment.usersLiked || []).some((u) => u.id === state.data.me);
   }
 
+  function withVisibleComments(thread) {
+    return { ...thread, comments: (thread.comments || []).filter((c) => !c.isDeleted && c.commentType !== 'system') };
+  }
+
   async function load(ctx) {
-    const { threads, source, me } = await AdmcApi.loadFile(ctx);
+    const { threads, source, iterationId, me } = await AdmcApi.loadFile(ctx);
     return {
       threads: threads
         .filter((t) => !t.isDeleted && t.threadContext?.filePath === ctx.path)
-        .map((t) => ({ ...t, comments: (t.comments || []).filter((c) => !c.isDeleted && c.commentType !== 'system') }))
+        .map(withVisibleComments)
         .filter((t) => t.comments.length > 0)
         .sort(compareThreads),
       source,
       sourceText: AdmcAnchor.sourceText(source),
+      iterationId,
       me,
     };
   }
@@ -104,7 +110,7 @@
     }
     state.data.threads.sort(compareThreads);
     if (state.container?.isConnected) render(state.ctx, state.container);
-    if (popover) fillPopover();
+    if (popoverView) fillPopover();
     return true;
   }
 
@@ -122,6 +128,15 @@
     await AdmcApi.setLike(ctx, thread.id, comment.id, !liked);
     const others = (comment.usersLiked || []).filter((u) => u.id !== state.data.me);
     comment.usersLiked = liked ? others : [...others, { id: state.data.me }];
+  }
+
+  // New thread covering whole source lines first..last. Returns the thread.
+  async function addThread(ctx, first, last, content) {
+    const lastLine = state.data.source.split(/\r?\n/)[last - 1] || '';
+    const thread = withVisibleComments(await AdmcApi.addThread(
+      ctx, state.data.iterationId, { line: first, offset: 1 }, { line: last, offset: lastLine.length + 1 }, content));
+    state.data.threads.push(thread);
+    return thread;
   }
 
   // ---------------------------------------------------------------------------- Finding the preview
@@ -240,25 +255,30 @@
     }
 
     const input = el('textarea', 'admc-reply');
-    input.rows = 2;
-    input.placeholder = 'Reply (Ctrl+Enter to send)';
     input.value = drafts.get(thread.id) || '';
     input.addEventListener('input', () => drafts.set(thread.id, input.value));
-    const send = el('button', 'admc-send', 'Reply');
+    box.append(composer(input, 'Reply', (text) => write(box, () => reply(ctx, thread, text))), el('div', 'admc-error'));
+    return box;
+  }
+
+  // Text box with a send button; Ctrl+Enter also sends. onSend gets the trimmed, non-empty text.
+  function composer(input, label, onSend) {
+    input.rows = 2;
+    input.placeholder = `${label} (Ctrl+Enter to send)`;
+    const send = el('button', 'admc-send', label);
     send.type = 'button';
     const submit = () => {
       const text = input.value.trim();
-      if (text) write(box, () => reply(ctx, thread, text));
+      if (text) onSend(text);
     };
     send.addEventListener('click', submit);
     input.addEventListener('keydown', (e) => {
       e.stopPropagation(); // keeps ADO keyboard shortcuts from firing while typing
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) submit();
     });
-    const replyRow = el('div', 'admc-reply-row');
-    replyRow.append(input, send);
-    box.append(replyRow, el('div', 'admc-error'));
-    return box;
+    const row = el('div', 'admc-reply-row');
+    row.append(input, send);
+    return row;
   }
 
   function closePopover() {
@@ -310,6 +330,8 @@
     clearMarks();
     const blocks = [...container.querySelectorAll(BLOCK_SELECTOR)].filter((b) => !isOurs(b));
     const lineMap = AdmcAnchor.mapLines(state.data.source, ownTexts(container, blocks));
+    state.blocks = blocks;
+    state.lineMap = lineMap;
     const byBlock = new Map();
     const placed = [];
     const unanchored = [];
@@ -388,9 +410,79 @@
   function teardown() {
     clearMarks();
     closePopover();
+    hideAddButton();
     panel?.remove();
     panel = null;
     state.container = null;
+  }
+
+  // ---------------------------------------------------------------------------- New threads
+
+  // Selecting text in the preview shows a "Comment" button. The new thread covers the whole
+  // source lines of the rendered block where the selection starts.
+  let addButton = null;
+
+  function hideAddButton() {
+    addButton?.remove();
+    addButton = null;
+  }
+
+  // [first, last] source lines (1-based) mapped to the block, or null if none are.
+  function linesForBlock(block) {
+    const index = state.blocks?.indexOf(block) ?? -1;
+    if (index === -1) return null;
+    const lines = [];
+    state.lineMap.forEach((b, i) => {
+      if (b === index) lines.push(i + 1);
+    });
+    return lines.length ? [lines[0], lines[lines.length - 1]] : null;
+  }
+
+  function selectedBlock() {
+    const selection = getSelection();
+    if (!selection || selection.isCollapsed || !selection.rangeCount || !state.container?.isConnected) return null;
+    const start = selection.getRangeAt(0).startContainer;
+    const block = (start instanceof Element ? start : start.parentElement)?.closest(BLOCK_SELECTOR);
+    return block && state.container.contains(block) && !isOurs(block) ? block : null;
+  }
+
+  function onSelectionEnd(e) {
+    if (e.target instanceof Element && isOurs(e.target)) return;
+    hideAddButton();
+    const block = state.data && selectedBlock();
+    const lines = block && linesForBlock(block);
+    if (!lines) return;
+    const rect = getSelection().getRangeAt(0).getBoundingClientRect();
+    addButton = el('button', `${ROOT_CLASS} admc-add`, '💬 Comment');
+    addButton.type = 'button';
+    addButton.style.left = `${Math.min(rect.right + 4, window.innerWidth - 120)}px`;
+    addButton.style.top = `${Math.max(rect.top - 4, 8)}px`;
+    addButton.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      openNewThread(addButton, lines);
+    });
+    document.body.append(addButton);
+  }
+
+  function openNewThread(anchor, [first, last]) {
+    closePopover();
+    popover = el('div', `${ROOT_CLASS} admc-popover`);
+    const box = el('div', 'admc-thread');
+    box.append(el('div', 'admc-thread-head admc-muted', first === last ? `New comment on line ${first}` : `New comment on lines ${first}-${last}`));
+    const input = el('textarea', 'admc-reply');
+    box.append(composer(input, 'Comment', async (text) => {
+      let thread;
+      if (!(await write(box, async () => { thread = await addThread(state.ctx, first, last, text); }))) return;
+      hideAddButton();
+      closePopover();
+      showThread(thread);
+    }), el('div', 'admc-error'));
+    popover.append(box);
+    document.body.append(popover);
+    const rect = anchor.getBoundingClientRect();
+    popover.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - popover.offsetWidth - 8))}px`;
+    popover.style.top = `${Math.min(rect.bottom + 4, window.innerHeight - popover.offsetHeight - 8)}px`;
+    input.focus();
   }
 
   // ---------------------------------------------------------------------------- ADO file tree
@@ -517,6 +609,14 @@
   document.addEventListener('click', (e) => {
     if (popover && !popover.contains(e.target)) closePopover();
   });
+  document.addEventListener('mouseup', (e) => setTimeout(() => {
+    try {
+      onSelectionEnd(e);
+    } catch (err) {
+      fail(err);
+    }
+  }));
+  window.addEventListener('scroll', hideAddButton, true);
   // ADO is a single-page app; URL changes via pushState fire no event a content script can see.
   let lastHref = location.href;
   setInterval(() => {

@@ -5,8 +5,8 @@
 //   anywhere else.
 // - Reads:  PR iterations, PR comment threads, the markdown file's content, and the signed-in
 //           user's ID (only used to show which comments they liked).
-// - Writes: thread status, replies, and comment likes. content.js calls these only from clicks
-//           or key presses in the extension's own UI.
+// - Writes: thread status, replies, comment likes, and new threads. content.js calls these only
+//           from clicks or key presses in the extension's own UI.
 // Uses the versioned Azure DevOps REST API 7.1 (Git pull request threads, iterations, items).
 (function (root) {
   const API_VERSION = '7.1';
@@ -51,7 +51,7 @@
         includeContent: 'true',
       })),
     ]);
-    return { threads: threads.value, source: file.content || '', me: await me };
+    return { threads: threads.value, source: file.content || '', iterationId: iteration.id, me: await me };
   }
 
   function setThreadStatus(ctx, threadId, status) {
@@ -66,5 +66,22 @@
     return request(threadUrl(ctx, threadId, `/comments/${commentId}/likes`), liked ? 'POST' : 'DELETE');
   }
 
-  root.AdmcApi = { loadFile, setThreadStatus, addReply, setLike };
+  // Creates an active thread on the file between start and end ({ line, offset }, 1-based) of the
+  // given iteration. The iteration context and the file's change tracking ID let ADO show the
+  // thread in its diff view and track it to later iterations.
+  async function addThread(ctx, iterationId, start, end, content) {
+    const changes = await request(gitUrl(ctx, `pullRequests/${ctx.prId}/iterations/${iterationId}/changes`, { $top: 2000 }));
+    const change = changes.changeEntries.find((c) => c.item?.path === ctx.path);
+    return request(gitUrl(ctx, `pullRequests/${ctx.prId}/threads`), 'POST', {
+      comments: [{ parentCommentId: 0, content, commentType: 1 }],
+      status: 1, // active
+      threadContext: { filePath: ctx.path, rightFileStart: start, rightFileEnd: end },
+      pullRequestThreadContext: change && {
+        changeTrackingId: change.changeTrackingId,
+        iterationContext: { firstComparingIteration: Number(ctx.base) || 1, secondComparingIteration: iterationId },
+      },
+    });
+  }
+
+  root.AdmcApi = { loadFile, setThreadStatus, addReply, setLike, addThread };
 })(this);

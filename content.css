@@ -151,6 +151,18 @@ span.admc-like {
   cursor: pointer;
 }
 
+.admc-add {
+  position: fixed;
+  z-index: 100000;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: #0078d4;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
 .admc-error {
   color: #d13438;
 }
